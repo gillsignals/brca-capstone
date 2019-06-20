@@ -1,0 +1,65 @@
+---
+title: "Untitled"
+author: "Amy Gill"
+date: "6/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+set.seed(11)
+tuning <- expand.grid(mtry = seq(6, 30, 6), splitrule = c("gini", "extratrees"), min.node.size = c(1, 3, 5))
+train_ranger <- train(train_x, train_y,
+                  method = "ranger",
+                  tuneGrid = tuning)
+train_ranger
+```
+
+```{r}
+ranger_preds <- predict(train_ranger, test_x)
+mean(ranger_preds == test_y)
+```
+
+
+
+```{r}
+# train PCA model
+pca_train <- prcomp(train_x)    # perform PCA on training set
+pc1 <- data.frame(pca_train$x[,1:7])    # extract first 7 PCs - 95% 
+train_pca <- train(pc1, train_y, method = "glm")
+
+pc_test <- predict(pca_train, newdata = test_x)[,1:7]
+pca_preds <- predict(train_pca, pc_test)
+mean(pca_preds == test_y)
+```
+
+```{r warning=FALSE}
+# define function to train GLMs incorporating various numbers of PCs
+find_pca_acc <- function(i){
+    pc1 <- data.frame(pca_train$x[,1:i])    # extract first i PCs
+    train_pca <- train(pc1, train_y, method = "glm")    # train GLM on PCA
+    train_pca$results[["Accuracy"]]    # report accuracy on training set
+}
+
+# find optimal number of PCs for GLM
+set.seed(2)
+pca_glm_accs <- sapply(2:10, find_pca_acc)    # check combinations of 2-10 PCs
+which.max(pca_glm_accs) + 1    # find optimal number of PCs by adding 1 to index
+```
+
+```{r}
+# train PCA model with optimal number of PCs, apply to test set
+set.seed(2)
+pc1 <- data.frame(pca_train$x[,1:8])
+train_pca <- train(pc1, train_y, method = "glm")
+pc_test <- predict(pca_train, newdata = test_x)[,1:8]
+pca_preds <- predict(train_pca, pc_test)
+mean(pca_preds == test_y)
+```
+
